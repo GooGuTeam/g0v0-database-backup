@@ -19,8 +19,8 @@ const (
 
 	HttpPort = 32400
 
-	fullBackupInterval        = 12 * time.Hour
-	incrementalBackupInterval = 30 * time.Minute
-	cleanupInterval           = 1 * time.Hour
-	rcloneUploadInterval      = 15 * time.Minute
+	defaultFullBackupInterval        = 12 * time.Hour
+	defaultIncrementalBackupInterval = 30 * time.Minute
+	defaultCleanupInterval           = 1 * time.Hour
+	defaultRcloneUploadInterval      = 15 * time.Minute
 )

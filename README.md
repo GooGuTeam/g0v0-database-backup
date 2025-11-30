@@ -18,7 +18,11 @@
     "mysql_port": 3306,  // MySQL 端口
     "parallel": 4,  // 备份时的并行线程数
     "local_backup_count": 7,  // 本地保留的备份数量
-    "default_rclone_remote": "onedrive:"  // 默认 Rclone 远程名称
+    "default_rclone_remote": "onedrive:",  // 默认 Rclone 远程名称
+    "full_backup_interval": "12h", // 全量备份间隔
+    "incremental_backup_interval": "30m", // 增量备份间隔
+    "cleanup_interval": "1h", // 清理旧备份间隔
+    "rclone_upload_interval": "15m" // 上传到 Rclone 间隔
 }
 ```
 

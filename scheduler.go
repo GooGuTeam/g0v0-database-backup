@@ -64,10 +64,10 @@ func rcloneUploadJob() {
 
 // Initialize and start scheduled jobs.
 func InitializeJobs() {
-	fullBackupTicker = time.NewTicker(fullBackupInterval)
-	incrementalBackupTicker = time.NewTicker(incrementalBackupInterval)
-	cleanupTicker = time.NewTicker(cleanupInterval)
-	rcloneUploadTicker = time.NewTicker(rcloneUploadInterval)
+	fullBackupTicker = time.NewTicker(config.FullBackupInterval)
+	incrementalBackupTicker = time.NewTicker(config.IncrementalBackupInterval)
+	cleanupTicker = time.NewTicker(config.CleanupInterval)
+	rcloneUploadTicker = time.NewTicker(config.RcloneUploadInterval)
 
 	go func() {
 		for range fullBackupTicker.C {

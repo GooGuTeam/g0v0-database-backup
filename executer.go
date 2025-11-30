@@ -29,7 +29,7 @@ func PerformFullBackup(drive string, comment string) error {
 		tracker.UpdateBackupStatus(backupTime, Uploaded)
 	}()
 
-	fullBackupTicker.Reset(fullBackupInterval)
+	fullBackupTicker.Reset(config.FullBackupInterval)
 	return nil
 }
 
@@ -60,7 +60,7 @@ func PerformIncrementalBackup(drive string, comment string) error {
 		tracker.UpdateBackupStatus(backupTime, Uploaded)
 	}()
 
-	incrementalBackupTicker.Reset(incrementalBackupInterval)
+	incrementalBackupTicker.Reset(config.IncrementalBackupInterval)
 	return nil
 }
 
