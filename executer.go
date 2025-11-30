@@ -24,7 +24,7 @@ func PerformFullBackup(drive string, comment string) error {
 		err = UploadToRClone(backupTime, drive, false)
 		if err != nil {
 			log.Println(err)
-			return 
+			return
 		}
 		tracker.UpdateBackupStatus(backupTime, Uploaded)
 	}()
@@ -55,7 +55,7 @@ func PerformIncrementalBackup(drive string, comment string) error {
 		err = UploadToRClone(backupTime, drive, true)
 		if err != nil {
 			log.Println(err)
-			return 
+			return
 		}
 		tracker.UpdateBackupStatus(backupTime, Uploaded)
 	}()

@@ -14,6 +14,7 @@ import (
 // Trigger a full backup.
 // Response: 204 No Content on success, 400 Bad Request on invalid input, 500 Internal Server Error on failure.
 // Request body:
+//
 //	drive (string): The rclone drive name to upload the backup to.
 //	comment (string, optional): An optional comment for the backup.
 func HandleFullBackup(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +44,7 @@ func HandleFullBackup(w http.ResponseWriter, r *http.Request) {
 // Trigger an incremental backup.
 // Response: 204 No Content on success, 400 Bad Request on invalid input, 500 Internal Server Error on failure.
 // Request body:
+//
 //	drive (string): The rclone drive name to upload the backup to.
 //	comment (string, optional): An optional comment for the backup.
 func HandleIncrementalBackup(w http.ResponseWriter, r *http.Request) {
@@ -68,11 +70,11 @@ func HandleIncrementalBackup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-
 // POST /download
 // Download a backup from rclone.
 // Response: 204 No Content on success, 400 Bad Request on invalid input, 500 Internal Server Error on failure.
 // Request body:
+//
 //	drive (string): The rclone drive name to download the backup from.
 //	backup_name (string): The backup filename.
 func HandleDownloadBackup(w http.ResponseWriter, r *http.Request) {
