@@ -12,13 +12,13 @@
 
 ```json
 {
-    "mysqlUser": "backup",  // 备份用户
-    "mysqlPassword": "your_password",  // 备份用户密码
-    "mysqlHost": "mysql",  // MySQL 主机地址
-    "mysqlPort": 3306,  // MySQL 端口
+    "mysql_user": "backup",  // 备份用户
+    "mysql_password": "your_password",  // 备份用户密码
+    "mysql_host": "mysql",  // MySQL 主机地址
+    "mysql_port": 3306,  // MySQL 端口
     "parallel": 4,  // 备份时的并行线程数
-    "localBackupCount": 7,  // 本地保留的备份数量
-    "rcloneRemote": "onedrive:"  // Rclone 远程名称
+    "local_backup_count": 7,  // 本地保留的备份数量
+    "default_rclone_remote": "onedrive:"  // 默认 Rclone 远程名称
 }
 ```
 

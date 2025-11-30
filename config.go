@@ -8,13 +8,13 @@ import (
 )
 
 type Config struct {
-	MysqlUser           string
-	MysqlPassword       string
-	MysqlHost           string
-	MysqlPort           int
-	Parallel            int
-	LocalBackupCount    int
-	DefaultRCloneRemote string
+	MysqlUser           string `json:"mysql_user"`
+	MysqlPassword       string `json:"mysql_password"`
+	MysqlHost           string `json:"mysql_host"`
+	MysqlPort           int    `json:"mysql_port"`
+	Parallel            int    `json:"parallel"`
+	LocalBackupCount    int    `json:"local_backup_count"`
+	DefaultRCloneRemote string `json:"default_rclone_remote"`
 }
 
 var config Config
