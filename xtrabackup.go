@@ -31,7 +31,13 @@ func CreateFullBackup(backupTime time.Time) error {
 }
 
 // Creates an incremental backup using xtrabackup.
-func CreateIncrementalBackup(backupTime time.Time, lastBackupTime time.Time) error {
+func CreateIncrementalBackup(backupTime time.Time, lastBackupTime time.Time, isIncremental bool) error {
+	var targetDir string
+	if isIncremental {
+		targetDir = FormatIncrementalBackupDir(lastBackupTime)
+	} else {
+		targetDir = FormatFullBackupDir(lastBackupTime)
+	}
 	log.Printf("Creating incremental backup %s\n", backupTime.Format(time.DateTime))
 	output, err := RunSubprocess(
 		"xtrabackup",
@@ -42,7 +48,7 @@ func CreateIncrementalBackup(backupTime time.Time, lastBackupTime time.Time) err
 		"--host="+config.MysqlHost,
 		"--port="+strconv.Itoa(config.MysqlPort),
 		"--target-dir="+FormatIncrementalBackupDir(backupTime),
-		"--incremental-basedir="+FormatFullBackupDir(lastBackupTime),
+		"--incremental-basedir="+targetDir,
 		"--parallel="+strconv.Itoa(config.Parallel),
 		"--compress=zstd",
 		"--compress-threads="+strconv.Itoa(config.Parallel))

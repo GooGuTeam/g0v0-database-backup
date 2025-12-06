@@ -99,31 +99,18 @@ func (t *Tracker) UpdateBackupStatus(backupTime time.Time, status Status) error 
 }
 
 // Get the last backup time.
-func (t *Tracker) GetLastBackupTime() (time.Time, error) {
+func (t *Tracker) GetLastBackupTime() (time.Time, bool, error) {
 	var backupTimeStr string
-	err := t.QueryRow("SELECT backup_time FROM backups WHERE type = 'full' ORDER BY backup_time DESC LIMIT 1").Scan(&backupTimeStr)
+	var backupType string
+	err := t.QueryRow("SELECT backup_time, type FROM backups ORDER BY backup_time DESC LIMIT 1").Scan(&backupTimeStr, &backupType)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, false, err
 	}
 	backupTime, err := time.Parse(time.RFC3339, backupTimeStr)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, false, err
 	}
-	return backupTime, nil
-}
-
-// Get the last full backup time.
-func (t *Tracker) GetLastFullBackupTime() (time.Time, error) {
-	var backupTimeStr string
-	err := t.QueryRow("SELECT backup_time FROM backups WHERE type = 'full' ORDER BY backup_time DESC LIMIT 1").Scan(&backupTimeStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-	backupTime, err := time.Parse(time.RFC3339, backupTimeStr)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return backupTime, nil
+	return backupTime, backupType == "incremental", nil
 }
 
 // Get old full backups that exceed the local backup count and not uploaded.

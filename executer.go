@@ -36,12 +36,12 @@ func PerformFullBackup(drive string, comment string) error {
 // A high-level function to perform an incremental backup and handle tracking and uploading.
 func PerformIncrementalBackup(drive string, comment string) error {
 	backupTime := time.Now()
-	lastBackupTime, err := tracker.GetLastBackupTime()
+	lastBackupTime, isIncremental, err := tracker.GetLastBackupTime()
 	if err != nil {
 		return err
 	}
 
-	err = CreateIncrementalBackup(backupTime, lastBackupTime)
+	err = CreateIncrementalBackup(backupTime, lastBackupTime, isIncremental)
 	if err != nil {
 		log.Println(err)
 		return err
