@@ -8,12 +8,14 @@ import (
 	"time"
 )
 
+const backupDateLayout = "0601/02" // YYMM/DD
+
 func FormatBackupTime(t time.Time) string {
 	return t.Format("20060102_1504")
 }
 
 func FormatBackupDatePath(t time.Time) string {
-	return t.Format("0601/02")
+	return t.Format(backupDateLayout)
 }
 
 func FormatFullBackupName(t time.Time) string {
