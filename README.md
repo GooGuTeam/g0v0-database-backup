@@ -162,7 +162,7 @@ xtrabackup --prepare --target-dir=/backup/2310/27/db_20231027_1200
 
 ## 4. 迁移旧的 rclone 备份目录
 
-仓库提供了脚本 `/home/runner/work/g0v0-database-backup/g0v0-database-backup/scripts/migrate_rclone_legacy_backups.sh`，可将远端中旧的平铺目录迁移到 `backup/YYMM/DD/`。
+仓库提供了脚本 `./scripts/migrate_rclone_legacy_backups.sh`，可将远端中旧的平铺目录迁移到 `backup/YYMM/DD/`。
 
 ```bash
 chmod +x ./scripts/migrate_rclone_legacy_backups.sh
