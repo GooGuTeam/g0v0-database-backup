@@ -16,12 +16,20 @@ func PerformFullBackup(drive string, comment string) error {
 		return err
 	}
 
-	err = tracker.TrackBackup(backupTime, Saved, "full", comment)
+	track := DatabaseTrack{
+		BackupTime: backupTime,
+		Status:     Saved,
+		Type:       "full",
+		Comment:    comment,
+		Path:       FormatBackupRelativePath(backupTime, false),
+	}
+
+	err = tracker.TrackBackup(track)
 	if err != nil {
 		return err
 	}
 	go func() {
-		err = UploadToRClone(backupTime, drive, false)
+		err = UploadToRClone(track, drive)
 		if err != nil {
 			log.Println(err)
 			return
@@ -36,23 +44,31 @@ func PerformFullBackup(drive string, comment string) error {
 // A high-level function to perform an incremental backup and handle tracking and uploading.
 func PerformIncrementalBackup(drive string, comment string) error {
 	backupTime := time.Now()
-	lastBackupTime, isIncremental, err := tracker.GetLastBackupTime()
+	lastTrack, err := tracker.GetLastBackup()
 	if err != nil {
 		return err
 	}
 
-	err = CreateIncrementalBackup(backupTime, lastBackupTime, isIncremental)
+	err = CreateIncrementalBackup(backupTime, lastTrack)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	err = tracker.TrackBackup(backupTime, Saved, "incremental", comment)
+	track := DatabaseTrack{
+		BackupTime: backupTime,
+		Status:     Saved,
+		Type:       "incremental",
+		Comment:    comment,
+		Path:       FormatBackupRelativePath(backupTime, true),
+	}
+
+	err = tracker.TrackBackup(track)
 	if err != nil {
 		return err
 	}
 	go func() {
-		err = UploadToRClone(backupTime, drive, true)
+		err = UploadToRClone(track, drive)
 		if err != nil {
 			log.Println(err)
 			return

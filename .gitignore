@@ -213,3 +213,4 @@ data/
 config.json
 rclone.conf
 docker-compose.yml
+g0v0-database-backup

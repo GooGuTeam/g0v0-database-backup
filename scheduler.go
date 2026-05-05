@@ -53,7 +53,7 @@ func rcloneUploadJob() {
 		return
 	}
 	for _, backup := range backups {
-		err := UploadToRClone(backup.BackupTime, config.DefaultRCloneRemote, backup.IsIncrementalBackup())
+		err := UploadToRClone(backup, config.DefaultRCloneRemote)
 		if err != nil {
 			log.Printf("Failed to upload backup %s: %v", backup.GetBackupPath(), err)
 			continue

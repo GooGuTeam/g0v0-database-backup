@@ -1,6 +1,7 @@
 # MySQL 数据库备份服务
 
 这是一个基于 Docker 和 Percona XtraBackup 的 MySQL 数据库备份服务。它支持全量备份、增量备份，并可以将备份上传到 Rclone 支持的云存储中。
+程序启动时会自动把 SQLite 中记录的旧备份路径迁移到 `backup/YYMM/DD/`，如果本地仍存在旧平铺目录下的备份，也会一起移动到新目录结构。
 
 ## 环境搭建
 
@@ -60,7 +61,7 @@ curl -X POST http://localhost:32400/incremental \
 
 ### 下载备份
 
-从云存储下载备份到本地的 `downloaded_backup` 目录。
+从云存储下载备份到本地的 `downloaded_backup` 目录。新版本会优先从 `backup/YYMM/DD/` 结构下载，并兼容旧的平铺路径。
 
 ```bash
 curl -X POST http://localhost:32400/download \
@@ -86,7 +87,7 @@ docker-compose exec backup-service bash
 
 ### 步骤 2: 定位备份文件
 
-- 本地生成的备份位于 `backup` 目录。
+- 本地生成的备份位于 `backup/YYMM/DD/` 目录。
 - 从云端下载的备份位于 `downloaded_backup` 目录。
 
 ### 步骤 3: 解压备份
@@ -94,8 +95,8 @@ docker-compose exec backup-service bash
 由于备份文件是使用 zstd 压缩的，在准备之前需要先解压。
 
 ```bash
-# 假设备份目录为 /backup/db_20231027_1200
-xtrabackup --decompress --target-dir=/backup/db_20231027_1200
+# 假设备份目录为 /backup/2310/27/db_20231027_1200
+xtrabackup --decompress --target-dir=/backup/2310/27/db_20231027_1200
 ```
 
 ### 步骤 4: 准备备份 (Prepare)
@@ -103,7 +104,7 @@ xtrabackup --decompress --target-dir=/backup/db_20231027_1200
 #### 情况 A: 仅恢复全量备份
 
 ```bash
-xtrabackup --prepare --target-dir=/backup/db_20231027_1200
+xtrabackup --prepare --target-dir=/backup/2310/27/db_20231027_1200
 ```
 
 #### 情况 B: 恢复全量备份 + 增量备份
@@ -113,13 +114,13 @@ xtrabackup --prepare --target-dir=/backup/db_20231027_1200
 1. 准备全量备份（注意使用 `--apply-log-only`）：
 
     ```bash
-    xtrabackup --prepare --apply-log-only --target-dir=/backup/db_full
+    xtrabackup --prepare --apply-log-only --target-dir=/backup/2310/27/db_full
     ```
 
 2. 将增量备份应用到全量备份上。如果有多个增量备份，可以依次应用。如果为最后一个增量备份，去掉 `--apply-log-only` 参数：
 
     ```bash
-    xtrabackup --prepare --apply-log-only --target-dir=/backup/db_full --incremental-dir=/backup/db_inc
+    xtrabackup --prepare --apply-log-only --target-dir=/backup/2310/27/db_full --incremental-dir=/backup/2310/27/db_inc
     ```
 
 ### 步骤 5: 恢复数据 (Copy-Back)
@@ -143,7 +144,7 @@ xtrabackup --prepare --target-dir=/backup/db_20231027_1200
 
     ```bash
     # 假设你要恢复到的目录是 /var/lib/mysql (容器内的挂载点)
-    xtrabackup --copy-back --target-dir=/backup/db_20231027_1200 --datadir=/var/lib/mysql
+    xtrabackup --copy-back --target-dir=/backup/2310/27/db_20231027_1200 --datadir=/var/lib/mysql
     ```
 
 4. 修复权限（在宿主机执行）：

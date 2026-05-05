@@ -4,6 +4,8 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
@@ -32,6 +34,8 @@ type DatabaseTrack struct {
 	Type string
 	// Optional comment.
 	Comment string
+	// Relative backup path.
+	Path string
 }
 
 func (track DatabaseTrack) IsFullBackup() bool {
@@ -43,11 +47,17 @@ func (track DatabaseTrack) IsIncrementalBackup() bool {
 }
 
 func (track DatabaseTrack) GetBackupPath() string {
-	if track.IsFullBackup() {
-		return FormatFullBackupDir(track.BackupTime)
-	} else {
-		return FormatIncrementalBackupDir(track.BackupTime)
+	return FormatBackupLocalPath(track.GetRelativeBackupPath())
+}
+
+func (track DatabaseTrack) GetRelativeBackupPath() string {
+	if track.Path != "" {
+		return NormalizeBackupRelativePath(track.Path)
 	}
+	if track.IsFullBackup() {
+		return FormatBackupRelativePath(track.BackupTime, false)
+	}
+	return FormatBackupRelativePath(track.BackupTime, true)
 }
 
 type Tracker struct {
@@ -64,7 +74,7 @@ func InitializeTracker() {
 	tracker = &Tracker{db}
 	err = initializeTrackingDB(tracker)
 	if err != nil {
-		log.Fatalln()
+		log.Fatalln(err)
 	}
 }
 
@@ -76,10 +86,20 @@ func initializeTrackingDB(db *Tracker) error {
 		backup_time TEXT NOT NULL,
 		status INTEGER NOT NULL,
 		type TEXT NOT NULL,
-		comment TEXT
+		comment TEXT,
+		backup_path TEXT NOT NULL DEFAULT ''
 	);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	err = ensureBackupPathColumn(db)
+	if err != nil {
+		return err
+	}
+
+	return migrateBackupPaths(db)
 }
 
 func (t *Tracker) Close() error {
@@ -87,8 +107,15 @@ func (t *Tracker) Close() error {
 }
 
 // Track a new backup in the database.
-func (t *Tracker) TrackBackup(backupTime time.Time, status Status, backupType string, comment string) error {
-	_, err := t.Exec("INSERT INTO backups (backup_time, status, type, comment) VALUES (?, ?, ?, ?)", backupTime.Format(time.RFC3339), status, backupType, comment)
+func (t *Tracker) TrackBackup(track DatabaseTrack) error {
+	_, err := t.Exec(
+		"INSERT INTO backups (backup_time, status, type, comment, backup_path) VALUES (?, ?, ?, ?, ?)",
+		track.BackupTime.Format(time.RFC3339),
+		track.Status,
+		track.Type,
+		track.Comment,
+		track.GetRelativeBackupPath(),
+	)
 	return err
 }
 
@@ -99,23 +126,23 @@ func (t *Tracker) UpdateBackupStatus(backupTime time.Time, status Status) error 
 }
 
 // Get the last backup time.
-func (t *Tracker) GetLastBackupTime() (time.Time, bool, error) {
+func (t *Tracker) GetLastBackup() (DatabaseTrack, error) {
+	var track DatabaseTrack
 	var backupTimeStr string
-	var backupType string
-	err := t.QueryRow("SELECT backup_time, type FROM backups ORDER BY backup_time DESC LIMIT 1").Scan(&backupTimeStr, &backupType)
+	err := t.QueryRow("SELECT id, backup_time, status, type, comment, backup_path FROM backups ORDER BY backup_time DESC LIMIT 1").Scan(&track.ID, &backupTimeStr, &track.Status, &track.Type, &track.Comment, &track.Path)
 	if err != nil {
-		return time.Time{}, false, err
+		return DatabaseTrack{}, err
 	}
-	backupTime, err := time.Parse(time.RFC3339, backupTimeStr)
+	track.BackupTime, err = time.Parse(time.RFC3339, backupTimeStr)
 	if err != nil {
-		return time.Time{}, false, err
+		return DatabaseTrack{}, err
 	}
-	return backupTime, backupType == "incremental", nil
+	return track, nil
 }
 
 // Get old full backups that exceed the local backup count and not uploaded.
 func (t *Tracker) GetOldBackups() ([]DatabaseTrack, error) {
-	rows, err := t.Query("SELECT id, backup_time, status, type, comment FROM backups WHERE type = 'full' AND status = 0 ORDER BY backup_time ASC")
+	rows, err := t.Query("SELECT id, backup_time, status, type, comment, backup_path FROM backups WHERE type = 'full' AND status = 0 ORDER BY backup_time ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +153,7 @@ func (t *Tracker) GetOldBackups() ([]DatabaseTrack, error) {
 	for rows.Next() {
 		var bt DatabaseTrack
 		var backupTimeStr string
-		err := rows.Scan(&bt.ID, &backupTimeStr, &bt.Status, &bt.Type, &bt.Comment)
+		err := rows.Scan(&bt.ID, &backupTimeStr, &bt.Status, &bt.Type, &bt.Comment, &bt.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +180,7 @@ func (t *Tracker) GetIncrementalTracks(parentTrack DatabaseTrack) ([]DatabaseTra
 	if nextParentTimeStr == "" {
 		nextParentTimeStr = time.Now().Format(time.RFC3339)
 	}
-	rows, err := t.Query("SELECT id, backup_time, status, type, comment FROM backups WHERE type = 'incremental' AND backup_time > ? AND backup_time < ? ORDER BY backup_time ASC", parentTrack.BackupTime.Format(time.RFC3339), nextParentTimeStr)
+	rows, err := t.Query("SELECT id, backup_time, status, type, comment, backup_path FROM backups WHERE type = 'incremental' AND backup_time > ? AND backup_time < ? ORDER BY backup_time ASC", parentTrack.BackupTime.Format(time.RFC3339), nextParentTimeStr)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +190,7 @@ func (t *Tracker) GetIncrementalTracks(parentTrack DatabaseTrack) ([]DatabaseTra
 	for rows.Next() {
 		var bt DatabaseTrack
 		var backupTimeStr string
-		err := rows.Scan(&bt.ID, &backupTimeStr, &bt.Status, &bt.Type, &bt.Comment)
+		err := rows.Scan(&bt.ID, &backupTimeStr, &bt.Status, &bt.Type, &bt.Comment, &bt.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +205,7 @@ func (t *Tracker) GetIncrementalTracks(parentTrack DatabaseTrack) ([]DatabaseTra
 
 // Get backups that are not yet uploaded.
 func (t *Tracker) GetPendingUploads() ([]DatabaseTrack, error) {
-	rows, err := t.Query("SELECT id, backup_time, status, type, comment FROM backups WHERE status = 0 ORDER BY backup_time ASC")
+	rows, err := t.Query("SELECT id, backup_time, status, type, comment, backup_path FROM backups WHERE status = 0 ORDER BY backup_time ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +215,7 @@ func (t *Tracker) GetPendingUploads() ([]DatabaseTrack, error) {
 	for rows.Next() {
 		var bt DatabaseTrack
 		var backupTimeStr string
-		err := rows.Scan(&bt.ID, &backupTimeStr, &bt.Status, &bt.Type, &bt.Comment)
+		err := rows.Scan(&bt.ID, &backupTimeStr, &bt.Status, &bt.Type, &bt.Comment, &bt.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -199,4 +226,132 @@ func (t *Tracker) GetPendingUploads() ([]DatabaseTrack, error) {
 		backups = append(backups, bt)
 	}
 	return backups, nil
+}
+
+func ensureBackupPathColumn(db *Tracker) error {
+	rows, err := db.Query("PRAGMA table_info(backups)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasBackupPath := false
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+		err = rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk)
+		if err != nil {
+			return err
+		}
+		if name == "backup_path" {
+			hasBackupPath = true
+			break
+		}
+	}
+	if hasBackupPath {
+		return nil
+	}
+
+	_, err = db.Exec("ALTER TABLE backups ADD COLUMN backup_path TEXT NOT NULL DEFAULT ''")
+	return err
+}
+
+func migrateBackupPaths(db *Tracker) error {
+	rows, err := db.Query("SELECT id, backup_time, type, backup_path FROM backups ORDER BY backup_time ASC")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type backupMigration struct {
+		id   int
+		time time.Time
+		typ  string
+		path string
+	}
+
+	var migrations []backupMigration
+	for rows.Next() {
+		var migration backupMigration
+		var backupTimeStr string
+		err = rows.Scan(&migration.id, &backupTimeStr, &migration.typ, &migration.path)
+		if err != nil {
+			return err
+		}
+		migration.time, err = time.Parse(time.RFC3339, backupTimeStr)
+		if err != nil {
+			return err
+		}
+		migrations = append(migrations, migration)
+	}
+
+	for _, migration := range migrations {
+		isIncremental := migration.typ == "incremental"
+		newRelativePath := FormatBackupRelativePath(migration.time, isIncremental)
+		currentRelativePath := NormalizeBackupRelativePath(migration.path)
+		moveCandidates := []string{
+			currentRelativePath,
+			FormatLegacyBackupRelativePath(migration.time, isIncremental),
+		}
+		for _, oldRelativePath := range moveCandidates {
+			if oldRelativePath == "" || oldRelativePath == newRelativePath {
+				continue
+			}
+			oldPath := FormatBackupLocalPath(oldRelativePath)
+			newPath := FormatBackupLocalPath(newRelativePath)
+			err = moveLocalBackupIfExists(oldPath, newPath)
+			if err != nil {
+				return err
+			}
+		}
+
+		if currentRelativePath != newRelativePath {
+			_, err = db.Exec("UPDATE backups SET backup_path = ? WHERE id = ?", newRelativePath, migration.id)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func moveLocalBackupIfExists(oldPath string, newPath string) error {
+	if oldPath == newPath {
+		return nil
+	}
+
+	_, err := os.Stat(oldPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	_, err = os.Stat(newPath)
+	if err == nil {
+		log.Printf("Skip moving local backup because target already exists: %s", newPath)
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+
+	err = os.MkdirAll(filepath.Dir(newPath), 0755)
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Moved local backup from %s to %s", oldPath, newPath)
+	return nil
 }
