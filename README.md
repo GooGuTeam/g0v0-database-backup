@@ -1,7 +1,6 @@
 # MySQL 数据库备份服务
 
 这是一个基于 Docker 和 Percona XtraBackup 的 MySQL 数据库备份服务。它支持全量备份、增量备份，并可以将备份上传到 Rclone 支持的云存储中。
-程序启动时会自动把 SQLite 中记录的旧备份路径迁移到 `backup/YYMM/DD/`。如果本地仍存在旧平铺目录下的备份，也会一起移动到新目录结构。
 
 ## 环境搭建
 
@@ -39,7 +38,7 @@ docker-compose up -d --build
 
 服务启动后将监听 `32400` 端口。
 
-## 2. API 使用说明
+## API 使用说明
 
 可以通过 HTTP 请求触发备份或下载任务。
 
@@ -61,7 +60,7 @@ curl -X POST http://localhost:32400/incremental \
 
 ### 下载备份
 
-从云存储下载备份到本地的 `downloaded_backup` 目录。新版本会优先从 `backup/YYMM/DD/` 结构下载，并兼容旧的平铺路径。
+从云存储下载备份到本地的 `downloaded_backup` 目录。
 
 ```bash
 curl -X POST http://localhost:32400/download \
@@ -75,7 +74,7 @@ curl -X POST http://localhost:32400/download \
 curl http://localhost:32400/health
 ```
 
-## 3. 备份恢复指南
+## 备份恢复指南
 
 本指南说明如何手动进入容器并使用 `xtrabackup` 恢复数据。
 
@@ -160,7 +159,11 @@ xtrabackup --prepare --target-dir=/backup/2310/27/db_20231027_1200
     docker start <mysql_container_name>
     ```
 
-## 4. 迁移旧的 rclone 备份目录
+## 从旧版迁移
+
+我们在新版本将原有的保存所有备份到根目录改为了存储到 `YYMM/DD/` 中。程序启动时会自动移动所有本地备份和把 SQLite 中记录的旧备份路径迁移到 `backup/YYMM/DD/`。如果本地仍存在旧平铺目录下的备份，也会一起移动到新目录结构。下载备份兼容了旧的平铺路径，但是我们建议迁移旧的存储在远端的备份。
+
+## 迁移旧的 rclone 备份目录
 
 仓库提供了脚本 `./scripts/migrate_rclone_legacy_backups.sh`，可将远端中旧的平铺目录迁移到 `backup/YYMM/DD/`。
 
