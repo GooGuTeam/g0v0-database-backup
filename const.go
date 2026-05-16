@@ -15,6 +15,7 @@ const (
 	configFileName       = "config.json"
 	sqliteDBPath         = "/data/data.db"
 	backupPath           = "/backup/"
+	remoteBackupBasePath = "backup/"
 	downloadedBackupPath = "/downloaded_backup/"
 
 	HttpPort = 32400

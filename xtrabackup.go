@@ -4,12 +4,20 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
 
 // Creates a full backup using xtrabackup.
 func CreateFullBackup(backupTime time.Time) error {
+	targetDir := FormatFullBackupDir(backupTime)
+	err := os.MkdirAll(filepath.Dir(targetDir), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to prepare full backup directory: %v", err)
+	}
+
 	log.Printf("Creating full backup %s\n", backupTime.Format(time.DateTime))
 	output, err := RunSubprocess(
 		"xtrabackup",
@@ -19,7 +27,7 @@ func CreateFullBackup(backupTime time.Time) error {
 		"--password="+config.MysqlPassword,
 		"--host="+config.MysqlHost,
 		"--port="+strconv.Itoa(config.MysqlPort),
-		"--target-dir="+FormatFullBackupDir(backupTime),
+		"--target-dir="+targetDir,
 		"--parallel="+strconv.Itoa(config.Parallel),
 		"--compress=zstd",
 		"--compress-threads="+strconv.Itoa(config.Parallel))
@@ -31,13 +39,13 @@ func CreateFullBackup(backupTime time.Time) error {
 }
 
 // Creates an incremental backup using xtrabackup.
-func CreateIncrementalBackup(backupTime time.Time, lastBackupTime time.Time, isIncremental bool) error {
-	var targetDir string
-	if isIncremental {
-		targetDir = FormatIncrementalBackupDir(lastBackupTime)
-	} else {
-		targetDir = FormatFullBackupDir(lastBackupTime)
+func CreateIncrementalBackup(backupTime time.Time, baseTrack DatabaseTrack) error {
+	targetDir := FormatIncrementalBackupDir(backupTime)
+	err := os.MkdirAll(filepath.Dir(targetDir), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to prepare incremental backup directory: %v", err)
 	}
+
 	log.Printf("Creating incremental backup %s\n", backupTime.Format(time.DateTime))
 	output, err := RunSubprocess(
 		"xtrabackup",
@@ -47,14 +55,14 @@ func CreateIncrementalBackup(backupTime time.Time, lastBackupTime time.Time, isI
 		"--password="+config.MysqlPassword,
 		"--host="+config.MysqlHost,
 		"--port="+strconv.Itoa(config.MysqlPort),
-		"--target-dir="+FormatIncrementalBackupDir(backupTime),
-		"--incremental-basedir="+targetDir,
+		"--target-dir="+targetDir,
+		"--incremental-basedir="+baseTrack.GetBackupPath(),
 		"--parallel="+strconv.Itoa(config.Parallel),
 		"--compress=zstd",
 		"--compress-threads="+strconv.Itoa(config.Parallel))
 	if err != nil {
 		return fmt.Errorf("Failed to create incremental backup: %v, output: %s", err, output)
 	}
-	log.Printf("Incremental backup %s on %s created successfully.\n", backupTime.Format(time.DateTime), lastBackupTime.Format(time.DateTime))
+	log.Printf("Incremental backup %s on %s created successfully.\n", backupTime.Format(time.DateTime), baseTrack.BackupTime.Format(time.DateTime))
 	return nil
 }

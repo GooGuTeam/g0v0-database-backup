@@ -38,7 +38,7 @@ docker-compose up -d --build
 
 服务启动后将监听 `32400` 端口。
 
-## 2. API 使用说明
+## API 使用说明
 
 可以通过 HTTP 请求触发备份或下载任务。
 
@@ -74,7 +74,7 @@ curl -X POST http://localhost:32400/download \
 curl http://localhost:32400/health
 ```
 
-## 3. 备份恢复指南
+## 备份恢复指南
 
 本指南说明如何手动进入容器并使用 `xtrabackup` 恢复数据。
 
@@ -86,7 +86,7 @@ docker-compose exec backup-service bash
 
 ### 步骤 2: 定位备份文件
 
-- 本地生成的备份位于 `backup` 目录。
+- 本地生成的备份位于 `backup/YYMM/DD/` 目录。
 - 从云端下载的备份位于 `downloaded_backup` 目录。
 
 ### 步骤 3: 解压备份
@@ -94,8 +94,8 @@ docker-compose exec backup-service bash
 由于备份文件是使用 zstd 压缩的，在准备之前需要先解压。
 
 ```bash
-# 假设备份目录为 /backup/db_20231027_1200
-xtrabackup --decompress --target-dir=/backup/db_20231027_1200
+# 假设备份目录为 /backup/2310/27/db_20231027_1200
+xtrabackup --decompress --target-dir=/backup/2310/27/db_20231027_1200
 ```
 
 ### 步骤 4: 准备备份 (Prepare)
@@ -103,7 +103,7 @@ xtrabackup --decompress --target-dir=/backup/db_20231027_1200
 #### 情况 A: 仅恢复全量备份
 
 ```bash
-xtrabackup --prepare --target-dir=/backup/db_20231027_1200
+xtrabackup --prepare --target-dir=/backup/2310/27/db_20231027_1200
 ```
 
 #### 情况 B: 恢复全量备份 + 增量备份
@@ -113,13 +113,13 @@ xtrabackup --prepare --target-dir=/backup/db_20231027_1200
 1. 准备全量备份（注意使用 `--apply-log-only`）：
 
     ```bash
-    xtrabackup --prepare --apply-log-only --target-dir=/backup/db_full
+    xtrabackup --prepare --apply-log-only --target-dir=/backup/2310/27/db_full
     ```
 
 2. 将增量备份应用到全量备份上。如果有多个增量备份，可以依次应用。如果为最后一个增量备份，去掉 `--apply-log-only` 参数：
 
     ```bash
-    xtrabackup --prepare --apply-log-only --target-dir=/backup/db_full --incremental-dir=/backup/db_inc
+    xtrabackup --prepare --apply-log-only --target-dir=/backup/2310/27/db_full --incremental-dir=/backup/2310/27/db_inc
     ```
 
 ### 步骤 5: 恢复数据 (Copy-Back)
@@ -143,7 +143,7 @@ xtrabackup --prepare --target-dir=/backup/db_20231027_1200
 
     ```bash
     # 假设你要恢复到的目录是 /var/lib/mysql (容器内的挂载点)
-    xtrabackup --copy-back --target-dir=/backup/db_20231027_1200 --datadir=/var/lib/mysql
+    xtrabackup --copy-back --target-dir=/backup/2310/27/db_20231027_1200 --datadir=/var/lib/mysql
     ```
 
 4. 修复权限（在宿主机执行）：
@@ -158,3 +158,21 @@ xtrabackup --prepare --target-dir=/backup/db_20231027_1200
     ```bash
     docker start <mysql_container_name>
     ```
+
+## 从旧版迁移
+
+我们在新版本将原有的保存所有备份到根目录改为了存储到 `YYMM/DD/` 中。程序启动时会自动移动所有本地备份和把 SQLite 中记录的旧备份路径迁移到 `backup/YYMM/DD/`。如果本地仍存在旧平铺目录下的备份，也会一起移动到新目录结构。下载备份兼容了旧的平铺路径，但是我们建议迁移旧的存储在远端的备份。
+
+## 迁移旧的 rclone 备份目录
+
+仓库提供了脚本 `./scripts/migrate_rclone_legacy_backups.sh`，可将远端中旧的平铺目录迁移到 `backup/YYMM/DD/`。
+
+```bash
+chmod +x ./scripts/migrate_rclone_legacy_backups.sh
+./scripts/migrate_rclone_legacy_backups.sh onedrive:
+```
+
+- 默认迁移 `backup/` 下的旧目录
+- 可通过第二个参数指定旧目录根路径，例如 `./scripts/migrate_rclone_legacy_backups.sh onedrive: backup`
+- 可设置 `DRY_RUN=1` 先预览要执行的 `rclone moveto`
+- 可设置 `RCLONE_CONFIG=/path/to/rclone.conf` 指定配置文件
